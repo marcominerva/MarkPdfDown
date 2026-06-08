@@ -13,6 +13,14 @@ public partial class PdfImagesToMarkdownExecutor([FromKeyedServices("PdfToMarkdo
     {
         var result = new ConversionResponse(request.FileName, request.ContentType);
 
+        //foreach (var (index, page) in request.Pages.Index())
+        //{
+        //    var message = new ChatMessage(ChatRole.User, [new DataContent(page, MediaTypeNames.Image.Jpeg)]);
+        //    var markdown = await agent.RunAsync(message, cancellationToken: cancellationToken);
+
+        //    result.Pages.Add(new ConversionResult(index, markdown.Text));
+        //}
+
         using var throttler = new SemaphoreSlim(3);
 
         var tasks = request.Pages.Select(async (page, index) =>
