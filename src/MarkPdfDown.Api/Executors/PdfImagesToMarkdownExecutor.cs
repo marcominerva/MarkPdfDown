@@ -26,6 +26,7 @@ public partial class PdfImagesToMarkdownExecutor([FromKeyedServices("PdfToMarkdo
         var tasks = request.Pages.Select(async (page, index) =>
             {
                 await throttler.WaitAsync(cancellationToken);
+
                 try
                 {
                     var message = new ChatMessage(ChatRole.User, [new DataContent(page, MediaTypeNames.Image.Jpeg)]);
