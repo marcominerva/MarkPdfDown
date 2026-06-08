@@ -59,6 +59,7 @@ builder.AddWorkflow("PdfToMarkdownConversionWorkflow", (services, key) =>
 
     var workflow = new WorkflowBuilder(formFileToConversionRequestExecutor).WithName(key)
         .AddEdge(formFileToConversionRequestExecutor, pdfToImageExecutor)
+        .AddEdge(pdfToImageExecutor, pdfToImageExecutor)
         .AddEdge(pdfToImageExecutor, pdfImageToMarkdownExecutor)
         .AddEdge(pdfImageToMarkdownExecutor, conversionAggregatingExecutor)
         .WithOutputFrom(conversionAggregatingExecutor)
