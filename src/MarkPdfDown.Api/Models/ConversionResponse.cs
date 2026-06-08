@@ -2,5 +2,5 @@
 
 public record class ConversionResponse(string FileName, string ContentType)
 {
-    public IList<ConversionResult> Pages { get; } = [];
+    public IList<ConversionResult> Pages { get; set; } = [];
 }

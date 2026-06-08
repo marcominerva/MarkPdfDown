@@ -1,4 +1,6 @@
 using System.ClientModel;
+using System.Net.Mime;
+using Markdig;
 using MarkPdfDown.Api.Executors;
 using MarkPdfDown.Api.Models;
 using MarkPdfDown.Api.Settings;
@@ -91,14 +93,25 @@ app.MapSwaggerUI(setupAction: options =>
 
 app.UseRouting();
 
-app.MapPost("/api/convert", async (IFormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow) =>
+app.MapPost("/api/convert", async (IFormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow, CancellationToken cancellationToken) =>
 {
-    await using var run = await InProcessExecution.RunAsync(workflow, file);
+    await using var run = await InProcessExecution.RunAsync(workflow, file, cancellationToken: cancellationToken);
     var result = run.NewEvents.OfType<WorkflowOutputEvent>().Select(e => e.Data).OfType<ConversionResponse>().FirstOrDefault();
 
     return TypedResults.Ok(result);
 })
 .DisableAntiforgery()
 .Produces<ConversionResponse>();
+
+app.MapPost("/api/md-to-html", async (ConversionResponse response) =>
+{
+    var markdownPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    var markdown = response.Pages.Select(p => p.Markdown).Aggregate((a, b) => $"{a}\n{b}");
+    var html = Markdown.ToHtml(markdown, markdownPipeline);
+
+    return TypedResults.Content(html, MediaTypeNames.Text.Html);
+})
+.Produces<string>();
 
 app.Run();
