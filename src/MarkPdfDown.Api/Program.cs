@@ -1,5 +1,6 @@
 using System.ClientModel;
 using MarkPdfDown.Api.Executors;
+using MarkPdfDown.Api.Models;
 using MarkPdfDown.Api.Settings;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
@@ -46,22 +47,19 @@ builder.Services.AddAIAgent("PdfToMarkdownConverterAgent", (services, key) =>
 });
 
 builder.Services.AddSingleton<FormFileToConversionRequestExecutor>();
-builder.Services.AddSingleton<PdfToImageExecutor>();
-builder.Services.AddSingleton<PdfImageToMarkdownExecutor>();
-builder.Services.AddSingleton<ConversionAggregatingExecutor>();
+builder.Services.AddSingleton<PdfToImagesExecutor>();
+builder.Services.AddSingleton<PdfImagesToMarkdownExecutor>();
 
 builder.AddWorkflow("PdfToMarkdownConversionWorkflow", (services, key) =>
 {
     var formFileToConversionRequestExecutor = services.GetRequiredService<FormFileToConversionRequestExecutor>();
-    var pdfToImageExecutor = services.GetRequiredService<PdfToImageExecutor>();
-    var pdfImageToMarkdownExecutor = services.GetRequiredService<PdfImageToMarkdownExecutor>();
-    var conversionAggregatingExecutor = services.GetRequiredService<ConversionAggregatingExecutor>();
+    var pdfToImageExecutor = services.GetRequiredService<PdfToImagesExecutor>();
+    var pdfImageToMarkdownExecutor = services.GetRequiredService<PdfImagesToMarkdownExecutor>();
 
     var workflow = new WorkflowBuilder(formFileToConversionRequestExecutor).WithName(key)
         .AddEdge(formFileToConversionRequestExecutor, pdfToImageExecutor)
         .AddEdge(pdfToImageExecutor, pdfImageToMarkdownExecutor)
-        .AddEdge(pdfImageToMarkdownExecutor, conversionAggregatingExecutor)
-        .WithOutputFrom(conversionAggregatingExecutor)
+        .WithOutputFrom(pdfImageToMarkdownExecutor)
         .Build(validateOrphans: true);
 
     return workflow;
@@ -96,8 +94,11 @@ app.UseRouting();
 app.MapPost("/api/convert", async (IFormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow) =>
 {
     await using var run = await InProcessExecution.RunAsync(workflow, file);
+    var result = run.NewEvents.OfType<WorkflowOutputEvent>().Select(e => e.Data).OfType<ConversionResponse>().FirstOrDefault();
 
-    return TypedResults.Ok();
-}).DisableAntiforgery();
+    return TypedResults.Ok(result);
+})
+.DisableAntiforgery()
+.Produces<ConversionResponse>();
 
 app.Run();
