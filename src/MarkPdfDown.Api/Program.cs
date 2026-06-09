@@ -94,7 +94,7 @@ app.MapSwaggerUI(setupAction: options =>
 
 app.UseRouting();
 
-app.MapPost("/api/convert", async (FormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow, CancellationToken cancellationToken) =>
+app.MapPost("/api/convert", async (IFormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow, CancellationToken cancellationToken) =>
 {
     await using var run = await InProcessExecution.RunAsync(workflow, file, cancellationToken: cancellationToken);
 
@@ -109,7 +109,8 @@ app.MapPost("/api/convert", async (FormFile file, [FromKeyedServices("PdfToMarkd
     return TypedResults.Ok(result);
 })
 .DisableAntiforgery()
-.Produces<ConversionResponse>();
+.Produces<ConversionResponse>()
+.ProducesValidationProblem();
 
 app.MapPost("/api/md-to-html", async (ConversionResponse response) =>
 {
@@ -120,6 +121,6 @@ app.MapPost("/api/md-to-html", async (ConversionResponse response) =>
 
     return TypedResults.Content(html, MediaTypeNames.Text.Html);
 })
-.Produces<string>();
+.Produces<string>(contentType: MediaTypeNames.Text.Html);
 
 app.Run();
