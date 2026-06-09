@@ -74,6 +74,7 @@ builder.Services.AddOpenApi(options =>
 
 });
 
+builder.Services.AddValidation();
 builder.Services.AddDefaultProblemDetails();
 builder.Services.AddDefaultExceptionHandler();
 
@@ -93,9 +94,16 @@ app.MapSwaggerUI(setupAction: options =>
 
 app.UseRouting();
 
-app.MapPost("/api/convert", async (IFormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow, CancellationToken cancellationToken) =>
+app.MapPost("/api/convert", async (FormFile file, [FromKeyedServices("PdfToMarkdownConversionWorkflow")] Workflow workflow, CancellationToken cancellationToken) =>
 {
     await using var run = await InProcessExecution.RunAsync(workflow, file, cancellationToken: cancellationToken);
+
+    var exception = run.NewEvents.OfType<WorkflowErrorEvent>().Select(e => e.Exception).FirstOrDefault();
+    if (exception is not null)
+    {
+        throw exception;
+    }
+
     var result = run.NewEvents.OfType<WorkflowOutputEvent>().Select(e => e.Data).OfType<ConversionResponse>().FirstOrDefault();
 
     return TypedResults.Ok(result);
