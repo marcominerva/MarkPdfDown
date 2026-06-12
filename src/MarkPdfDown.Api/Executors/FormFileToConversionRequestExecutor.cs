@@ -10,7 +10,6 @@ public partial class FormFileToConversionRequestExecutor() : Executor(nameof(For
     {
         await using var stream = file.OpenReadStream();
 
-        // Get the byte array from the stream.
         await using var memoryStream = new MemoryStream();
         await stream.CopyToAsync(memoryStream, cancellationToken);
         var fileBytes = memoryStream.ToArray();

@@ -1,6 +1,6 @@
-﻿namespace MarkPdfDown.Api.Models;
+﻿using System.ComponentModel;
 
-public record class ConversionResponse(string FileName, string ContentType)
-{
-    public IList<ConversionResult> Pages { get; init; } = [];
-}
+namespace MarkPdfDown.Api.Models;
+
+public record class ConversionResponse(string MarkdownContent,
+    [property: Description("The number of pages in the PDF")] int PageCount);
