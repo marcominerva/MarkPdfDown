@@ -1,9 +1,12 @@
 using System.ClientModel;
+using System.Net.Mime;
+using System.Text;
 using MarkPdfDown.Api.Executors;
 using MarkPdfDown.Api.Models;
 using MarkPdfDown.Api.Settings;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Responses;
@@ -32,10 +35,16 @@ builder.Services.AddAIAgent("PdfToMarkdownConverterAgent", (services, key) =>
         ChatOptions = new()
         {
             Instructions = """
-                You are an assistant that is able to convert a PDF file into the corresponding markdown code.
+                You are an assistant that is able to convert a PDF file (or a PDF that contains scanned images of documents) into the corresponding markdown code.
                 Your purpose is to help users obtain markdown representations of PDF pages, making them easier to edit and share as text.
+                The conversion is performed one page at a time: each request contains a PDF with a single page, and you must return the complete content of that page only.
+                Never summarize, never extract only highlights and never skip content: the markdown must contain everything that is visible on the page, in the original order.
+                You must preserve the original structure of the content: render tables as markdown tables, keeping all their rows and columns, and render bulleted and numbered lists as markdown lists, keeping their nesting levels. Never turn tables or lists into plain paragraphs.
+                If the request includes an excerpt of the previous page, use it only to keep the formatting consistent and to continue elements that started there: never include that excerpt in your answer.
+                If the page contains images, you must insert a description of each image's content at the same position where the image appears, so it is useful for searches based on the image content.
                 You must return the raw markdown directly, without wrapping the response in any code blocks or markdown fences.
                 """,
+            MaxOutputTokens = 16384,
             Reasoning = new()
             {
                 Effort = ReasoningEffort.None,
@@ -105,6 +114,24 @@ app.MapPost("/api/convert", async ([AllowedExtensions("pdf")] IFormFile file, [F
 })
 .DisableAntiforgery()
 .Produces<ConversionResponse>()
+.ProducesValidationProblem();
+
+app.MapPost("/api/export", async ([AllowedExtensions("pdf")] IFormFile file, [FromKeyedServices("PdfToMarkdownWorkflow")] Workflow workflow, CancellationToken cancellationToken) =>
+{
+    await using var run = await InProcessExecution.RunAsync(workflow, file, cancellationToken: cancellationToken);
+    var events = run.NewEvents.ToList();
+
+    var exception = events.OfType<WorkflowErrorEvent>().Select(e => e.Exception).FirstOrDefault();
+    if (exception is not null)
+    {
+        throw exception;
+    }
+
+    var result = events.OfType<WorkflowOutputEvent>().Select(e => e.Data).OfType<ConversionResponse>().FirstOrDefault();
+    return TypedResults.Stream(new MemoryStream(Encoding.UTF8.GetBytes(result?.MarkdownContent ?? string.Empty)), MediaTypeNames.Text.Markdown, $"{Path.GetFileNameWithoutExtension(file.FileName)}.md");
+})
+.DisableAntiforgery()
+.Produces<FileStreamHttpResult>()
 .ProducesValidationProblem();
 
 app.Run();
