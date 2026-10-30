@@ -32,6 +32,7 @@ builder.Services.AddAIAgent("PdfToMarkdownConverterAgent", (services, key) =>
     return chatClient.AsAIAgent(new()
     {
         Name = key,
+        Id = key.ToLowerInvariant(),
         ChatOptions = new()
         {
             Instructions = """
@@ -79,6 +80,7 @@ builder.Services.AddOpenApi(options =>
 });
 
 builder.Services.AddValidation();
+
 builder.Services.AddDefaultProblemDetails();
 builder.Services.AddDefaultExceptionHandler();
 
